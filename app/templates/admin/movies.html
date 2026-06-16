@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Filmy - Panel Admina</title>
+    <title>Filmy - Panel administracyjny</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -22,7 +22,7 @@
         .topbar h1 { font-size: 1.3em; color: #ffd200; }
         .topbar nav a { color: #aaa; text-decoration: none; margin-left: 20px; font-size: 0.9em; }
         .topbar nav a:hover { color: #ffd200; }
-        .container { max-width: 900px; margin: 0 auto; padding: 30px 20px; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 30px 20px; }
         .card {
             background: rgba(255,255,255,0.05);
             border-radius: 12px;
@@ -31,7 +31,7 @@
         }
         .card h2 { font-size: 1.15em; margin-bottom: 15px; color: #ffd200; }
         table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px 8px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06); vertical-align: middle; }
         th { color: #888; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.5px; }
         .btn {
             padding: 6px 14px;
@@ -53,10 +53,22 @@
         .empty { text-align: center; color: #666; padding: 30px; }
         .back-link { display: inline-block; margin-top: 15px; color: #ffd200; text-decoration: none; }
         .back-link:hover { text-decoration: underline; }
-        @media (max-width: 600px) {
+        .mini-poster { width: 36px; height: 54px; border-radius: 4px; object-fit: cover; display: block; background: rgba(255,255,255,0.05); }
+        .age-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75em;
+            font-weight: 600;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .rating-star { color: #ffd200; }
+        @media (max-width: 768px) {
             .topbar { flex-direction: column; gap: 10px; text-align: center; }
             .topbar nav a { margin: 0 8px; }
-            table { font-size: 0.85em; }
+            table { font-size: 0.8em; }
+            th:nth-child(4), td:nth-child(4) { display: none; }
         }
     </style>
 </head>
@@ -79,13 +91,16 @@
         {% endwith %}
 
         <div class="card">
-            <h2>🎬 Wszystkie filmy</h2>
+            <h2>🎬 Wszystkie filmy ({{ movies|length }})</h2>
             {% if movies %}
+            <div style="overflow-x: auto;">
             <table>
                 <thead>
                     <tr>
-                        <th>ID</th>
+                        <th></th>
                         <th>Tytuł</th>
+                        <th>Ocena</th>
+                        <th>Wiek</th>
                         <th>Runda</th>
                         <th>Data</th>
                         <th>Akcje</th>
@@ -94,8 +109,14 @@
                 <tbody>
                     {% for m in movies %}
                     <tr>
-                        <td>{{ m.id }}</td>
+                        <td>
+                            {% if m.poster_url %}
+                            <img src="{{ m.poster_url }}" alt="" class="mini-poster" onerror="this.style.display='none'">
+                            {% endif %}
+                        </td>
                         <td>{{ m.title }}</td>
+                        <td>{% if m.rating %}<span class="rating-star">⭐ {{ m.rating }}</span>{% endif %}</td>
+                        <td>{% if m.age_rating %}<span class="age-badge">{{ m.age_rating }}</span>{% endif %}</td>
                         <td>{{ m.round_added }}</td>
                         <td>{{ m.created_at.strftime('%d-%m-%Y %H:%M') if m.created_at else '—' }}</td>
                         <td>
@@ -107,6 +128,7 @@
                     {% endfor %}
                 </tbody>
             </table>
+            </div>
             {% else %}
             <div class="empty">Brak filmów</div>
             {% endif %}

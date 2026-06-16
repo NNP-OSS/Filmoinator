@@ -3,6 +3,10 @@ CREATE TABLE IF NOT EXISTS movies (
     title VARCHAR(500) NOT NULL,
     submitted_by VARCHAR(100) DEFAULT 'anonymous',
     round_added INTEGER DEFAULT 1,
+    tmdb_id INTEGER,
+    poster_url VARCHAR(500),
+    rating FLOAT,
+    age_rating VARCHAR(10),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

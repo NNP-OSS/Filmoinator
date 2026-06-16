@@ -2,24 +2,48 @@
 {% block content %}
 
 {% if phase == 'submission' %}
-<div class="card">
-    <h2>📝 Dodaj film do obejrzenia</h2>
-    <p class="label">Runda {{ round.round_number }} — dodawanie filmów</p>
-    <form method="POST" action="{{ url_for('submit_movie') }}">
-        <input type="text" name="title" placeholder="Wpisz tytuł filmu..." required autocomplete="off">
-        <button type="submit" class="btn btn-primary btn-block mt-10">Dodaj film</button>
+<div class="card search-card">
+    <h2>📝 Wyszukaj i dodaj film</h2>
+    <p class="label">Runda {{ round.round_number }} — wyszukaj film z bazy TMDB</p>
+    <div class="search-wrapper">
+        <input type="text" id="movie-search" placeholder="Wpisz tytuł filmu..." autocomplete="off">
+        <div id="search-results" class="search-dropdown"></div>
+    </div>
+    <form id="submit-form" method="POST" action="{{ url_for('submit_movie') }}">
+        <input type="hidden" name="tmdb_id" id="tmdb-id">
+        <input type="hidden" name="title" id="movie-title">
     </form>
+    <p class="text-muted mt-10" style="font-size: 0.85em; color: #666;">
+        lub <a href="#" id="manual-link" style="color: #888;">wpisz ręcznie</a>
+    </p>
 </div>
 
 <div class="card">
     <h2>🎬 Dodane filmy</h2>
-    <ul class="movie-list">
+    {% if movies %}
+    <div class="movie-grid">
         {% for m in movies %}
-        <li>{{ m.title }}</li>
-        {% else %}
-        <li style="color: #666; text-align: center; padding: 20px;">Brak filmów. Dodaj pierwszy!</li>
+        <div class="movie-card">
+            {% if m.poster_url %}
+            <img src="{{ m.poster_url }}" alt="{{ m.title }}" class="movie-poster" loading="lazy" onerror="this.style.display='none'">
+            {% endif %}
+            <div class="movie-info">
+                <div class="movie-title">{{ m.title }}</div>
+                <div class="movie-meta">
+                    {% if m.rating %}
+                    <span class="movie-rating">⭐ {{ m.rating }}</span>
+                    {% endif %}
+                    {% if m.age_rating %}
+                    <span class="movie-age">{{ m.age_rating }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
         {% endfor %}
-    </ul>
+    </div>
+    {% else %}
+    <div class="empty-state">Brak filmów. Wyszukaj i dodaj pierwszy!</div>
+    {% endif %}
 </div>
 
 {% elif phase == 'voting' %}
@@ -41,16 +65,29 @@
     </div>
     {% else %}
     <form method="POST" action="{{ url_for('vote') }}">
-        <ul class="movie-list">
+        <div class="movie-grid">
             {% for m in movies %}
-            <li>
-                <span>{{ m.title }}</span>
-                <button type="submit" name="movie_id" value="{{ m.id }}" class="vote-btn">Głosuj</button>
-            </li>
+            <div class="movie-card vote-card" onclick="this.querySelector('.vote-btn').click()">
+                {% if m.poster_url %}
+                <img src="{{ m.poster_url }}" alt="{{ m.title }}" class="movie-poster" loading="lazy" onerror="this.style.display='none'">
+                {% endif %}
+                <div class="movie-info">
+                    <div class="movie-title">{{ m.title }}</div>
+                    <div class="movie-meta">
+                        {% if m.rating %}
+                        <span class="movie-rating">⭐ {{ m.rating }}</span>
+                        {% endif %}
+                        {% if m.age_rating %}
+                        <span class="movie-age">{{ m.age_rating }}</span>
+                        {% endif %}
+                    </div>
+                    <button type="submit" name="movie_id" value="{{ m.id }}" class="vote-btn" style="margin-top:10px;">Głosuj</button>
+                </div>
+            </div>
             {% else %}
-            <li style="color: #666; text-align: center; padding: 20px;">Brak filmów w tej rundzie.</li>
+            <div class="empty-state">Brak filmów w tej rundzie.</div>
             {% endfor %}
-        </ul>
+        </div>
     </form>
     {% endif %}
 </div>
@@ -67,28 +104,34 @@
         {% elif res_round == 2 %}2 najlepsze filmy przechodzą do finału.
         {% elif res_round == 3 %}Zwycięski film został wybrany!{% endif %}
     </p>
-    <ul class="movie-list">
+    <div class="movie-grid">
         {% for r in results %}
-        <li>
-            <span>
-                {% if r.position == 1 %}🥇
-                {% elif r.position == 2 %}🥈
-                {% elif r.position == 3 %}🥉
-                {% endif %}
-                {{ movie_map[r.position].title if movie_map[r.position] else '—' }}
-            </span>
-            <span class="badge
-                {% if r.position == 1 %}badge-gold
-                {% elif r.position == 2 %}badge-silver
-                {% elif r.position == 3 %}badge-bronze
-                {% else %}badge-gray{% endif %}">
-                Miejsce {{ r.position }}
-            </span>
-        </li>
+        {% set m = movie_map[r.position] %}
+        <div class="movie-card result-card pos-{{ r.position }}">
+            {% if m and m.poster_url %}
+            <img src="{{ m.poster_url }}" alt="{{ m.title }}" class="movie-poster" loading="lazy" onerror="this.style.display='none'">
+            {% endif %}
+            <div class="movie-info">
+                <div class="movie-title">{{ m.title if m else '—' }}</div>
+                <div class="movie-meta">
+                    {% if m and m.rating %}
+                    <span class="movie-rating">⭐ {{ m.rating }}</span>
+                    {% endif %}
+                    {% if m and m.age_rating %}
+                    <span class="movie-age">{{ m.age_rating }}</span>
+                    {% endif %}
+                </div>
+                <div class="movie-position">
+                    {% if r.position == 1 %}🥇 1. miejsce
+                    {% elif r.position == 2 %}🥈 2. miejsce
+                    {% elif r.position == 3 %}🥉 3. miejsce{% endif %}
+                </div>
+            </div>
+        </div>
         {% else %}
-        <li style="color: #666; text-align: center; padding: 20px;">Brak wyników.</li>
+        <div class="empty-state">Brak wyników.</div>
         {% endfor %}
-    </ul>
+    </div>
 </div>
 
 {% if round.round_number < 3 %}

@@ -16,7 +16,7 @@
             align-items: center;
         }
         .container {
-            max-width: 800px;
+            max-width: 900px;
             width: 100%;
             padding: 30px 20px;
         }
@@ -42,7 +42,11 @@
             padding: 30px;
             margin-bottom: 20px;
             border: 1px solid rgba(255,255,255,0.08);
+            overflow: visible;
+            position: relative;
+            z-index: 1;
         }
+        .card.search-card { z-index: 2; }
         .card h2 { margin-bottom: 20px; font-size: 1.3em; color: #ffd200; }
         .flash { padding: 12px 16px; border-radius: 8px; margin-bottom: 15px; font-size: 0.95em; }
         .flash.success { background: rgba(76, 175, 80, 0.2); border: 1px solid #4caf50; color: #81c784; }
@@ -77,15 +81,8 @@
         .btn-secondary:hover { background: rgba(255,255,255,0.2); }
         .btn-sm { padding: 8px 16px; font-size: 0.85em; }
         .btn-block { width: 100%; }
-        .movie-list { list-style: none; }
-        .movie-list li {
-            padding: 12px 16px;
-            border-bottom: 1px solid rgba(255,255,255,0.06);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .movie-list li:last-child { border-bottom: none; }
+        .btn-xs { padding: 6px 12px; font-size: 0.8em; }
+
         .badge {
             display: inline-block;
             padding: 3px 10px;
@@ -97,6 +94,7 @@
         .badge-silver { background: #b0bec5; color: #1a1a2e; }
         .badge-bronze { background: #a1887f; color: #1a1a2e; }
         .badge-gray { background: rgba(255,255,255,0.1); color: #aaa; }
+
         .vote-btn {
             background: none;
             border: 2px solid #ffd200;
@@ -106,9 +104,11 @@
             cursor: pointer;
             font-size: 0.9em;
             transition: all 0.2s;
+            width: 100%;
         }
         .vote-btn:hover { background: #ffd200; color: #1a1a2e; }
         .vote-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
         .admin-link {
             position: fixed;
             bottom: 20px;
@@ -120,16 +120,17 @@
             text-decoration: none;
             font-size: 0.85em;
             transition: all 0.2s;
+            z-index: 100;
         }
         .admin-link:hover { background: rgba(255,255,255,0.2); color: #fff; }
-        .winner-box {
-            text-align: center;
-            padding: 30px;
-        }
+
+        .winner-box { text-align: center; padding: 30px; }
         .winner-box .trophy { font-size: 4em; margin-bottom: 10px; }
         .winner-box h3 { font-size: 2em; color: #ffd200; margin-bottom: 5px; }
         .winner-box p { color: #aaa; }
+
         .label { color: #888; font-size: 0.85em; margin-bottom: 8px; display: block; }
+        .text-muted { color: #888; font-size: 0.9em; }
         .mt-10 { margin-top: 10px; }
         .mt-20 { margin-top: 20px; }
         .mb-10 { margin-bottom: 10px; }
@@ -140,10 +141,99 @@
         .nav-links { margin-top: 15px; display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; }
         .nav-links a { color: #ffd200; text-decoration: none; font-size: 0.95em; }
         .nav-links a:hover { text-decoration: underline; }
+
+        .empty-state { color: #666; text-align: center; padding: 30px; font-size: 0.95em; }
+
+        /* Search */
+        .search-wrapper { position: relative; z-index: 100; }
+        .search-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #1e1e3a;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 0 0 12px 12px;
+            max-height: 420px;
+            overflow-y: auto;
+            z-index: 999;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+        .search-dropdown.open { display: block; }
+        .search-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            cursor: pointer;
+            transition: background 0.15s;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .search-item:last-child { border-bottom: none; }
+        .search-item:hover { background: rgba(255,210,0,0.1); }
+        .search-item img {
+            width: 40px;
+            height: 60px;
+            border-radius: 4px;
+            object-fit: cover;
+            background: rgba(255,255,255,0.05);
+            flex-shrink: 0;
+        }
+        .search-item .si-title { font-size: 0.95em; font-weight: 500; }
+        .search-item .si-meta { font-size: 0.8em; color: #888; margin-top: 2px; }
+        .search-item .si-rating { color: #ffd200; margin-left: auto; white-space: nowrap; flex-shrink: 0; }
+        .search-error { padding: 20px; text-align: center; color: #e57373; font-size: 0.9em; }
+        .search-loading { padding: 20px; text-align: center; color: #888; font-size: 0.9em; }
+
+        /* Movie grid & cards */
+        .movie-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 16px;
+        }
+        .movie-card {
+            background: rgba(255,255,255,0.04);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.06);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .movie-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+        .movie-poster {
+            width: 100%;
+            aspect-ratio: 2/3;
+            object-fit: cover;
+            display: block;
+            background: rgba(255,255,255,0.03);
+        }
+        .movie-info { padding: 12px; }
+        .movie-title { font-size: 0.9em; font-weight: 500; line-height: 1.3; }
+        .movie-meta { display: flex; gap: 8px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
+        .movie-rating { font-size: 0.8em; color: #ffd200; }
+        .movie-age {
+            font-size: 0.75em;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.08);
+            color: #aaa;
+            font-weight: 600;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .movie-position { margin-top: 8px; font-size: 0.85em; font-weight: 600; }
+
+        .vote-card { cursor: pointer; }
+        .vote-card:hover { border-color: #ffd200; }
+
+        .result-card.pos-1 { border-color: rgba(255,210,0,0.3); }
+        .result-card.pos-2 { border-color: rgba(176,190,197,0.3); }
+        .result-card.pos-3 { border-color: rgba(161,136,127,0.3); }
+
         @media (max-width: 600px) {
             header h1 { font-size: 1.8em; }
             .container { padding: 15px 10px; }
             .card { padding: 20px 15px; }
+            .movie-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
         }
     </style>
 </head>
@@ -165,5 +255,109 @@
         {% block content %}{% endblock %}
     </div>
     <a href="{{ url_for('admin_login') }}" class="admin-link">🔧 Panel administracyjny</a>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var searchInput = document.getElementById('movie-search');
+        var searchResults = document.getElementById('search-results');
+        var tmdbIdInput = document.getElementById('tmdb-id');
+        var titleInput = document.getElementById('movie-title');
+        var submitForm = document.getElementById('submit-form');
+
+        if (!searchInput) return;
+
+        var debounceTimer = null;
+
+        searchInput.addEventListener('input', function() {
+            clearTimeout(debounceTimer);
+            var q = this.value.trim();
+            if (q.length < 2) {
+                searchResults.classList.remove('open');
+                searchResults.innerHTML = '';
+                return;
+            }
+            debounceTimer = setTimeout(function() {
+                searchResults.innerHTML = '<div class="search-loading">Szukanie...</div>';
+                searchResults.classList.add('open');
+                fetch('/api/search?q=' + encodeURIComponent(q))
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.error) {
+                            searchResults.innerHTML = '<div class="search-error">' + data.error + '</div>';
+                            return;
+                        }
+                        if (!data.length) {
+                            searchResults.innerHTML = '<div class="search-loading">Brak wyników</div>';
+                            return;
+                        }
+                        var html = '';
+                        data.forEach(function(m) {
+                            var poster = m.poster ? m.poster : '';
+                            var year = m.year ? '(' + m.year + ')' : '';
+                            var rating = m.rating ? '⭐ ' + m.rating : '';
+                            html += '<div class="search-item" data-tmdb="' + m.tmdb_id + '" data-title="' + escapeAttr(m.title) + '">';
+                            if (poster) {
+                                html += '<img src="' + poster + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">';
+                            } else {
+                                html += '<div style="width:40px;height:60px;border-radius:4px;background:rgba(255,255,255,0.05);flex-shrink:0;"></div>';
+                            }
+                            html += '<div><div class="si-title">' + escapeHtml(m.title) + ' ' + escapeHtml(year) + '</div>';
+                            html += '<div class="si-meta">' + escapeHtml(m.overview) + '</div></div>';
+                            html += '<div class="si-rating">' + rating + '</div>';
+                            html += '</div>';
+                        });
+                        searchResults.innerHTML = html;
+
+                        document.querySelectorAll('.search-item').forEach(function(item) {
+                            item.addEventListener('click', function() {
+                                tmdbIdInput.value = this.dataset.tmdb;
+                                titleInput.value = '';
+                                submitForm.submit();
+                            });
+                        });
+                    })
+                    .catch(function() {
+                        searchResults.innerHTML = '<div class="search-error">Błąd wyszukiwania</div>';
+                    });
+            }, 300);
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+                searchResults.classList.remove('open');
+            }
+        });
+
+        searchInput.addEventListener('focus', function() {
+            if (searchResults.children.length > 0) {
+                searchResults.classList.add('open');
+            }
+        });
+
+        var manualLink = document.getElementById('manual-link');
+        if (manualLink) {
+            manualLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                var title = prompt('Wpisz tytuł filmu:');
+                if (title && title.trim()) {
+                    tmdbIdInput.value = '';
+                    titleInput.value = title.trim();
+                    submitForm.submit();
+                }
+            });
+        }
+    });
+
+    function escapeHtml(s) {
+        if (!s) return '';
+        var div = document.createElement('div');
+        div.appendChild(document.createTextNode(s));
+        return div.innerHTML;
+    }
+    function escapeAttr(s) {
+        if (!s) return '';
+        return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+    </script>
 </body>
 </html>

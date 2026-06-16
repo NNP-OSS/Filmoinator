@@ -1,5 +1,7 @@
 import os
 import uuid
+import json
+import hashlib
 from functools import wraps
 
 from flask import (
@@ -8,6 +10,7 @@ from flask import (
 )
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
+from tmdb import search_movies, get_age_rating, get_movie_details
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'default_secret_key')
@@ -16,10 +19,43 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
 )
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-ADMIN_USER = os.environ.get('ADMIN_USER', 'admin')
-ADMIN_PASS = os.environ.get('ADMIN_PASS', 'admin123')
+CONFIG_PATH = os.environ.get('CONFIG_PATH', '/data/config.json')
 
 db = SQLAlchemy(app)
+
+
+def load_config():
+    if not os.path.exists(CONFIG_PATH):
+        return {}
+    try:
+        with open(CONFIG_PATH) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return {}
+
+
+def save_config(data):
+    os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+    with open(CONFIG_PATH, 'w') as f:
+        json.dump(data, f, indent=2)
+
+
+def is_setup_done():
+    cfg = load_config()
+    return bool(cfg.get('setup_complete'))
+
+
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
+def check_password(password, stored_hash):
+    return hash_password(password) == stored_hash
+
+
+def get_config_value(key, default=''):
+    cfg = load_config()
+    return cfg.get(key, default)
 
 
 class Movie(db.Model):
@@ -28,6 +64,10 @@ class Movie(db.Model):
     title = db.Column(db.String(500), nullable=False)
     submitted_by = db.Column(db.String(100), default='anonymous')
     round_added = db.Column(db.Integer, default=1)
+    tmdb_id = db.Column(db.Integer, nullable=True)
+    poster_url = db.Column(db.String(500), nullable=True)
+    rating = db.Column(db.Float, nullable=True)
+    age_rating = db.Column(db.String(10), nullable=True)
     created_at = db.Column(db.DateTime, server_default=text('CURRENT_TIMESTAMP'))
 
 
@@ -123,6 +163,49 @@ def advance_round(current_round):
     return advancing
 
 
+# ---------- Setup / before_request ----------
+
+@app.before_request
+def check_setup():
+    if request.path.startswith('/setup') or request.path.startswith('/static'):
+        return
+    if not is_setup_done():
+        return redirect(url_for('setup'))
+
+
+@app.route('/setup', methods=['GET', 'POST'])
+def setup():
+    if is_setup_done():
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        admin_user = request.form.get('admin_user', '').strip()
+        admin_pass = request.form.get('admin_pass', '')
+        admin_pass2 = request.form.get('admin_pass2', '')
+        tmdb_key = request.form.get('tmdb_key', '').strip()
+
+        if not admin_user or not admin_pass:
+            flash('Podaj nazwę użytkownika i hasło.', 'error')
+            return render_template('setup.html')
+        if admin_pass != admin_pass2:
+            flash('Hasła nie są zgodne.', 'error')
+            return render_template('setup.html')
+        if len(admin_pass) < 4:
+            flash('Hasło musi mieć co najmniej 4 znaki.', 'error')
+            return render_template('setup.html')
+
+        save_config({
+            'setup_complete': True,
+            'admin_user': admin_user,
+            'admin_pass_hash': hash_password(admin_pass),
+            'tmdb_api_key': tmdb_key,
+        })
+        flash('Konfiguracja zakończona! Zaloguj się do panelu admina.', 'success')
+        return redirect(url_for('admin_login'))
+
+    return render_template('setup.html')
+
+
 # ---------- User routes ----------
 
 @app.route('/')
@@ -143,7 +226,7 @@ def index():
     resp = None
 
     if not active_round:
-        winner = Result.query.filter_by(round_number=3).first()
+        winner = Result.query.filter_by(round_number=3, position=1).first()
         if winner:
             movie = Movie.query.get(winner.movie_id)
             resp = make_response(render_template('index.html', phase='finished', movie=movie))
@@ -189,6 +272,18 @@ def index():
     return resp
 
 
+@app.route('/api/search')
+def api_search():
+    q = request.args.get('q', '').strip()
+    if not q or len(q) < 2:
+        return jsonify([])
+    api_key = get_config_value('tmdb_api_key')
+    if not api_key:
+        return jsonify({"error": "Brak klucza API TMDB. Uzupełnij w panelu admina."}), 503
+    results = search_movies(q, api_key)
+    return jsonify(results)
+
+
 @app.route('/submit', methods=['POST'])
 def submit_movie():
     active_round = get_active_round()
@@ -196,20 +291,47 @@ def submit_movie():
         flash('Dodawanie filmów nie jest teraz aktywne.', 'error')
         return redirect(url_for('index'))
 
+    tmdb_id = request.form.get('tmdb_id')
     title = request.form.get('title', '').strip()
-    if not title:
-        flash('Podaj tytuł filmu.', 'error')
-        return redirect(url_for('index'))
 
-    existing = Movie.query.filter_by(title=title, round_added=active_round.round_number).first()
-    if existing:
-        flash('Ten film już został dodany w tej rundzie.', 'error')
-        return redirect(url_for('index'))
+    if tmdb_id:
+        tmdb_id = int(tmdb_id)
+        api_key = get_config_value('tmdb_api_key')
+        if not api_key:
+            flash('Brak klucza API TMDB.', 'error')
+            return redirect(url_for('index'))
+        details = get_movie_details(tmdb_id, api_key)
+        if not details:
+            flash('Nie znaleziono filmu w TMDB.', 'error')
+            return redirect(url_for('index'))
+        title = details["title"]
+        age_rating = get_age_rating(tmdb_id, api_key)
+        existing = Movie.query.filter_by(title=title, round_added=active_round.round_number).first()
+        if existing:
+            flash('Ten film już został dodany w tej rundzie.', 'error')
+            return redirect(url_for('index'))
+        movie = Movie(
+            title=title,
+            tmdb_id=tmdb_id,
+            poster_url=details["poster"],
+            rating=details["rating"],
+            age_rating=age_rating,
+            submitted_by='anonymous',
+            round_added=active_round.round_number
+        )
+    else:
+        if not title:
+            flash('Podaj tytuł filmu lub wybierz z wyszukiwarki.', 'error')
+            return redirect(url_for('index'))
+        existing = Movie.query.filter_by(title=title, round_added=active_round.round_number).first()
+        if existing:
+            flash('Ten film już został dodany w tej rundzie.', 'error')
+            return redirect(url_for('index'))
+        movie = Movie(title=title, submitted_by='anonymous', round_added=active_round.round_number)
 
-    movie = Movie(title=title, submitted_by='anonymous', round_added=active_round.round_number)
     db.session.add(movie)
     db.session.commit()
-    flash('Film został dodany!', 'success')
+    flash(f'Dodano: {movie.title}', 'success')
     return redirect(url_for('index'))
 
 
@@ -251,33 +373,35 @@ def vote():
 
 @app.route('/wyniki')
 def wyniki():
-    results = Result.query.filter_by(round_number=3).first()
-    if results:
-        movie = Movie.query.get(results.movie_id)
-        return render_template('wyniki.html', movie=movie)
+    winner = Result.query.filter_by(round_number=3, position=1).first()
+    winner_movie = Movie.query.get(winner.movie_id) if winner else None
 
-    prev_results = Result.query.order_by(Result.round_number.desc()).all()
-    movie_map = {}
+    all_results = Result.query.order_by(Result.round_number, Result.position).all()
+    movie_cache = {}
     round_info = {}
-    for r in prev_results:
-        m = Movie.query.get(r.movie_id)
-        if m:
-            movie_map[r.id] = m
+    for r in all_results:
+        if r.movie_id not in movie_cache:
+            movie_cache[r.movie_id] = Movie.query.get(r.movie_id)
         if r.round_number not in round_info:
             round_info[r.round_number] = []
-        round_info[r.round_number].append(r)
+        round_info[r.round_number].append((r, movie_cache[r.movie_id]))
 
-    return render_template('wyniki.html', movie=None, round_info=round_info, movie_map=movie_map)
+    return render_template('wyniki.html', winner=winner_movie, round_info=round_info)
 
 
 # ---------- Admin routes ----------
 
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
+    cfg = load_config()
+    admin_user = cfg.get('admin_user', '')
+    admin_hash = cfg.get('admin_pass_hash', '')
+    if not admin_user or not admin_hash:
+        return redirect(url_for('setup'))
     if request.method == 'POST':
         username = request.form.get('username', '')
         password = request.form.get('password', '')
-        if username == ADMIN_USER and password == ADMIN_PASS:
+        if username == admin_user and check_password(password, admin_hash):
             session['admin_logged_in'] = True
             return redirect(url_for('admin_dashboard'))
         flash('Nieprawidłowe dane logowania.', 'error')
@@ -411,8 +535,52 @@ def admin_set_submission():
     return redirect(url_for('admin_dashboard'))
 
 
+@app.route('/admin/settings', methods=['GET', 'POST'])
+@admin_required
+def admin_settings():
+    cfg = load_config()
+    if request.method == 'POST':
+        admin_user = request.form.get('admin_user', '').strip()
+        admin_pass = request.form.get('admin_pass', '')
+        admin_pass2 = request.form.get('admin_pass2', '')
+        tmdb_key = request.form.get('tmdb_key', '').strip()
+
+        if admin_pass or admin_pass2:
+            if admin_pass != admin_pass2:
+                flash('Hasła nie są zgodne.', 'error')
+                return redirect(url_for('admin_settings'))
+            if len(admin_pass) < 4:
+                flash('Hasło musi mieć co najmniej 4 znaki.', 'error')
+                return redirect(url_for('admin_settings'))
+            cfg['admin_pass_hash'] = hash_password(admin_pass)
+
+        if admin_user:
+            cfg['admin_user'] = admin_user
+
+        cfg['tmdb_api_key'] = tmdb_key
+        save_config(cfg)
+        flash('Ustawienia zapisane.', 'success')
+        return redirect(url_for('admin_settings'))
+
+    return render_template('admin/settings.html',
+                           admin_user=cfg.get('admin_user', ''),
+                           tmdb_key=cfg.get('tmdb_api_key', ''))
+
+
+def migrate_db():
+    try:
+        db.session.execute(text("ALTER TABLE movies ADD COLUMN IF NOT EXISTS tmdb_id INTEGER"))
+        db.session.execute(text("ALTER TABLE movies ADD COLUMN IF NOT EXISTS poster_url VARCHAR(500)"))
+        db.session.execute(text("ALTER TABLE movies ADD COLUMN IF NOT EXISTS rating FLOAT"))
+        db.session.execute(text("ALTER TABLE movies ADD COLUMN IF NOT EXISTS age_rating VARCHAR(10)"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+
 with app.app_context():
     db.create_all()
+    migrate_db()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

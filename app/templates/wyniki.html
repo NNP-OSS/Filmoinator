@@ -1,62 +1,61 @@
 {% extends "base.html" %}
 {% block content %}
 
+{% if winner %}
 <div class="card">
-    <h2>🏆 Wyniki</h2>
-
-    {% if movie %}
     <div class="winner-box">
         <div class="trophy">🏆</div>
-        <h3>{{ movie.title }}</h3>
+        <h3>{{ winner.title }}</h3>
         <p>Zwycięski film całego głosowania!</p>
-        <div class="nav-links mt-20">
-            <a href="{{ url_for('index') }}">← Powrót</a>
-        </div>
     </div>
-    {% endif %}
+</div>
+{% endif %}
 
-    {% if round_info %}
-    {% for rn in range(1, 4) %}
-    {% if rn in round_info %}
-    <div class="card" style="margin-top: 15px;">
-        <h3>
-            {% if rn == 1 %}📊 Runda 1 — wybór 3 filmów
-            {% elif rn == 2 %}📊 Runda 2 — wybór 2 filmów
-            {% elif rn == 3 %}🏆 Runda 3 — finał{% endif %}
-        </h3>
-        <ul class="movie-list">
-            {% for r in round_info[rn] %}
-            <li>
-                <span>
-                    {% if r.position == 1 %}🥇
-                    {% elif r.position == 2 %}🥈
-                    {% elif r.position == 3 %}🥉{% endif %}
-                    {{ movie_map[r.id].title if movie_map[r.id] else '—' }}
-                </span>
-                <span class="badge
-                    {% if r.position == 1 %}badge-gold
-                    {% elif r.position == 2 %}badge-silver
-                    {% elif r.position == 3 %}badge-bronze
-                    {% else %}badge-gray{% endif %}">
-                    Miejsce {{ r.position }}
-                </span>
-            </li>
-            {% endfor %}
-        </ul>
-    </div>
-    {% endif %}
-    {% endfor %}
-    <div class="nav-links mt-20">
-        <a href="{{ url_for('index') }}">← Powrót</a>
-    </div>
-    {% elif not movie %}
-    <div class="text-center" style="padding: 30px;">
-        <p style="color: #888;">Brak wyników. Głosowanie jeszcze się nie zakończyło.</p>
-        <div class="nav-links mt-20">
-            <a href="{{ url_for('index') }}">← Powrót</a>
+{% if round_info %}
+{% for rn in range(1, 4) %}
+{% if rn in round_info %}
+<div class="card">
+    <h3>
+        {% if rn == 1 %}📊 Runda 1 — wybór 3 filmów
+        {% elif rn == 2 %}📊 Runda 2 — wybór 2 filmów
+        {% elif rn == 3 %}🏆 Runda 3 — finał{% endif %}
+    </h3>
+    <div class="movie-grid">
+        {% for r, m in round_info[rn] %}
+        <div class="movie-card result-card pos-{{ r.position }}">
+            {% if m and m.poster_url %}
+            <img src="{{ m.poster_url }}" alt="{{ m.title }}" class="movie-poster" loading="lazy" onerror="this.style.display='none'">
+            {% endif %}
+            <div class="movie-info">
+                <div class="movie-title">{{ m.title if m else '—' }}</div>
+                <div class="movie-meta">
+                    {% if m and m.rating %}
+                    <span class="movie-rating">⭐ {{ m.rating }}</span>
+                    {% endif %}
+                    {% if m and m.age_rating %}
+                    <span class="movie-age">{{ m.age_rating }}</span>
+                    {% endif %}
+                </div>
+                <div class="movie-position">
+                    {% if r.position == 1 %}🥇 1. miejsce
+                    {% elif r.position == 2 %}🥈 2. miejsce
+                    {% elif r.position == 3 %}🥉 3. miejsce{% endif %}
+                </div>
+            </div>
         </div>
+        {% endfor %}
     </div>
-    {% endif %}
+</div>
+{% endif %}
+{% endfor %}
+{% elif not winner %}
+<div class="card text-center" style="padding: 30px;">
+    <p style="color: #888;">Brak wyników. Głosowanie jeszcze się nie zakończyło.</p>
+</div>
+{% endif %}
+
+<div class="nav-links mt-20">
+    <a href="{{ url_for('index') }}">← Powrót</a>
 </div>
 
 {% endblock %}

@@ -19,8 +19,9 @@ services:
     environment:
       DATABASE_URL: postgresql://filmoinator:filmoinator_secret@db:5432/filmoinator
       SECRET_KEY: zmien_to_na_wlasny_klucz
-      ADMIN_USER: admin
-      ADMIN_PASS: admin123
+      CONFIG_PATH: /data/config.json
+    volumes:
+      - ./config.json:/data/config.json
     depends_on:
       db:
         condition: service_healthy
