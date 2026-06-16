@@ -1,23 +1,99 @@
-# Filmoinator
+# 🍿 Filmoinator
 
-## Instalacja:
+Aplikacja webowa do wybierania filmów na wspólny seans. Użytkownicy dodają propozycje filmów, głosują w rundach, a system wyłania zwycięzcę.
 
-1. Zainstaluj docker: https://docs.docker.com/desktop/setup/install/
+## Funkcje
 
-2. Sklonuj repozytorium:
+- **Wyszukiwarka filmów** — integracja z TMDB (plakaty, oceny, oznaczenia wiekowe)
+- **System głosowania** — 3 rundy eliminacyjne (top 3 → top 2 → zwycięzca)
+- **Ochrona przed wielokrotnym głosowaniem** — ciasteczka uniemożliwiają głosowanie 2x w tej samej rundzie
+
+## Wymagania
+
+- [Docker](https://docs.docker.com/desktop/setup/install/)
+
+## Szybki start
 
 ```bash
 git clone https://github.com/NNP-OSS/Filmoinator.git
 cd Filmoinator
+docker compose up -d
 ```
 
-3. W docker-compose.yml dotosuj:
+Po uruchomieniu wejdź na **http://localhost** — pierwsze uruchomienie przekieruje do konfiguracji.
 
-   - Login i hasło administratora
-   - Port
+## Konfiguracja
 
-4. Uruchom:
+### Pierwsze uruchomienie
 
-   ```bash
-   docker compose up -d
-   ```
+1. Wejdź na http://localhost
+2. Wypełnij formularz:
+   - **Nazwa użytkownika** — login do panelu administracyjnego
+   - **Hasło** — minimum 4 znaki
+   - **Klucz API TMDB** (opcjonalnie) — potrzebny do wyszukiwania filmów
+
+### Klucz API TMDB
+
+1. Załóż konto na [themoviedb.org](https://www.themoviedb.org/settings/api)
+2. Wygeneruj **API Read Access Token (v4)**
+3. Wpisz go podczas konfiguracji lub później w panelu admina → Ustawienia
+
+### Zmiana portu
+
+W `docker-compose.yml` zmień mapowanie portów dla serwisu `nginx`:
+
+```yaml
+services:
+  nginx:
+    ports:
+      - "8080:80"   # zmień 8080 na dowolny port
+```
+
+### Zmiana klucza secret (sessions)
+
+W `docker-compose.yml` dla serwisu `app`:
+
+```yaml
+environment:
+  SECRET_KEY: twoj_wlasny_klucz
+```
+
+## Resetowanie hasła / konfiguracji
+
+Usuń plik `config.json` (leży obok `docker-compose.yml`) i zrestartuj kontenery:
+
+```bash
+rm config.json
+docker compose restart
+```
+
+Po wejściu na stronę zobaczysz ponownie formularz konfiguracji. **Baza danych** (filmy, głosy, wyniki) pozostaje nienaruszona.
+
+## Jak to działa
+
+| Runda | Faza | Opis |
+|---|---|---|
+| 1 | Dodawanie filmów | Użytkownicy wyszukują i dodają filmy z TMDB |
+| 1 | Głosowanie | Głosowanie, 3 najlepsze filmy przechodzą dalej |
+| 2 | Głosowanie | Głosowanie na 3 filmy, 2 najlepsze przechodzą do finału |
+| 3 | Głosowanie (finał) | Wybór zwycięskiego filmu |
+
+Administrator steruje fazami z poziomu panelu administracyjnego.
+
+## Panel administracyjny
+
+Dostępny pod adresem `/admin/login`. Funkcje:
+
+- Sterowanie rundami (rozpoczęcie/zakończenie głosowania)
+- Podgląd statystyk głosowania na żywo
+- Zarządzanie filmami (przeglądanie/usuwanie)
+- Zmiana klucza TMDB, loginu i hasła
+- Resetowanie całego głosowania
+
+## Technologie
+
+- **Backend:** Python, Flask, SQLAlchemy, Gunicorn
+- **Baza danych:** PostgreSQL 16
+- **Serwer HTTP:** Nginx
+- **API zewnętrzne:** TMDB (The Movie Database)
+- **Konteneryzacja:** Docker, Docker Compose
