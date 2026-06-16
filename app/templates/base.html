@@ -256,6 +256,8 @@
     </div>
     <a href="{{ url_for('admin_dashboard') }}" class="admin-link">🔧 Panel administracyjny</a>
 
+    <div id="device-id" style="position:fixed;bottom:20px;left:20px;color:#444;font-size:0.75em;font-family:monospace;z-index:100;user-select:all;"></div>
+
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         var searchInput = document.getElementById('movie-search');
@@ -358,6 +360,15 @@
         if (!s) return '';
         return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
+
+    (function() {
+        var match = document.cookie.match(/(?:^|;\s*)visitor_id=([^;]*)/);
+        if (match) {
+            var id = match[1];
+            var shortId = '#' + id.substring(0, 4).toUpperCase();
+            document.getElementById('device-id').textContent = shortId;
+        }
+    })();
     </script>
 </body>
 </html>

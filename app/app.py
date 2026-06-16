@@ -89,7 +89,14 @@ class Vote(db.Model):
     ip_address = db.Column(db.String(50), nullable=True)
     user_agent = db.Column(db.String(500), nullable=True)
     created_at = db.Column(db.DateTime, server_default=text('CURRENT_TIMESTAMP'))
-    __table_args__ = (db.UniqueConstraint('round_number', 'visitor_id'),)
+
+
+class ExtraVote(db.Model):
+    __tablename__ = 'extra_votes'
+    id = db.Column(db.Integer, primary_key=True)
+    round_number = db.Column(db.Integer, nullable=False)
+    visitor_id = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime, server_default=text('CURRENT_TIMESTAMP'))
 
 
 class Result(db.Model):
@@ -349,10 +356,13 @@ def vote():
         flash('Błąd identyfikatora. Spróbuj odświeżyć stronę.', 'error')
         return redirect(url_for('index'))
 
-    existing = Vote.query.filter_by(
+    existing_count = Vote.query.filter_by(
         round_number=active_round.round_number, visitor_id=visitor_id
-    ).first()
-    if existing:
+    ).count()
+    extra_count = ExtraVote.query.filter_by(
+        round_number=active_round.round_number, visitor_id=visitor_id
+    ).count()
+    if existing_count >= 1 + extra_count:
         flash('Już głosowałeś w tej rundzie!', 'error')
         return redirect(url_for('index'))
 
@@ -545,6 +555,21 @@ def admin_delete_vote(vote_id):
     return redirect(request.referrer or url_for('admin_votes'))
 
 
+@app.route('/admin/votes/extra-vote/<int:vote_id>', methods=['POST'])
+@admin_required
+def admin_allow_extra_vote(vote_id):
+    vote = Vote.query.get(vote_id)
+    if vote:
+        ev = ExtraVote(
+            round_number=vote.round_number,
+            visitor_id=vote.visitor_id
+        )
+        db.session.add(ev)
+        db.session.commit()
+        flash('Zezwolono na dodatkowy głos dla tego użytkownika.', 'success')
+    return redirect(request.referrer or url_for('admin_votes'))
+
+
 @app.route('/admin/reset', methods=['POST'])
 @admin_required
 def admin_reset():
@@ -626,6 +651,7 @@ def migrate_db():
         db.session.execute(text("ALTER TABLE movies ADD COLUMN IF NOT EXISTS age_rating VARCHAR(10)"))
         db.session.execute(text("ALTER TABLE votes ADD COLUMN IF NOT EXISTS ip_address VARCHAR(50)"))
         db.session.execute(text("ALTER TABLE votes ADD COLUMN IF NOT EXISTS user_agent VARCHAR(500)"))
+        db.session.execute(text("ALTER TABLE votes DROP CONSTRAINT IF EXISTS votes_round_number_visitor_id_key"))
         db.session.commit()
     except Exception:
         db.session.rollback()

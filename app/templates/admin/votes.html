@@ -130,8 +130,8 @@
                                   onsubmit="return confirm('Cofnąć ten głos?')" style="display:inline;">
                                 <button type="submit" class="btn btn-secondary btn-sm">Cofnij głos</button>
                             </form>
-                            <form method="POST" action="{{ url_for('admin_delete_vote', vote_id=v.id) }}"
-                                  onsubmit="return confirm('Zezwolić na dodatkowy głos? Obecny głos zostanie usunięty.')" style="display:inline;">
+                            <form method="POST" action="{{ url_for('admin_allow_extra_vote', vote_id=v.id) }}"
+                                  onsubmit="return confirm('Zezwolić temu użytkownikowi na dodatkowy głos?')" style="display:inline;">
                                 <button type="submit" class="btn btn-danger btn-sm">Zezwól na dodatkowy głos</button>
                             </form>
                         </td>
