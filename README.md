@@ -60,10 +60,10 @@ environment:
 
 ## Resetowanie hasła / konfiguracji
 
-Usuń plik `config.json` (leży obok `docker-compose.yml`) i zrestartuj kontenery:
+Usuń plik `data/config.json` i zrestartuj kontenery:
 
 ```bash
-rm config.json
+rm data/config.json
 docker compose restart
 ```
 

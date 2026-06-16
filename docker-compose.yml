@@ -21,7 +21,7 @@ services:
       SECRET_KEY: zmien_to_na_wlasny_klucz
       CONFIG_PATH: /data/config.json
     volumes:
-      - ./config.json:/data/config.json
+      - ./data:/data
     depends_on:
       db:
         condition: service_healthy
