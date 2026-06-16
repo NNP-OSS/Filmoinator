@@ -86,6 +86,8 @@ class Vote(db.Model):
     movie_id = db.Column(db.Integer, db.ForeignKey('movies.id', ondelete='CASCADE'), nullable=False)
     round_number = db.Column(db.Integer, nullable=False)
     visitor_id = db.Column(db.String(100), nullable=False)
+    ip_address = db.Column(db.String(50), nullable=True)
+    user_agent = db.Column(db.String(500), nullable=True)
     created_at = db.Column(db.DateTime, server_default=text('CURRENT_TIMESTAMP'))
     __table_args__ = (db.UniqueConstraint('round_number', 'visitor_id'),)
 
@@ -354,6 +356,16 @@ def vote():
         flash('Już głosowałeś w tej rundzie!', 'error')
         return redirect(url_for('index'))
 
+    cfg = load_config()
+    if cfg.get('vote_per_ip'):
+        client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+        ip_vote = Vote.query.filter_by(
+            round_number=active_round.round_number, ip_address=client_ip
+        ).first()
+        if ip_vote:
+            flash('Z tego adresu IP już głosowano w tej rundzie.', 'error')
+            return redirect(url_for('index'))
+
     movie_id = request.form.get('movie_id')
     if not movie_id:
         flash('Wybierz film.', 'error')
@@ -364,7 +376,15 @@ def vote():
         flash('Nieprawidłowy film.', 'error')
         return redirect(url_for('index'))
 
-    vote = Vote(movie_id=int(movie_id), round_number=active_round.round_number, visitor_id=visitor_id)
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    ua = request.headers.get('User-Agent', '')[:500]
+    vote = Vote(
+        movie_id=int(movie_id),
+        round_number=active_round.round_number,
+        visitor_id=visitor_id,
+        ip_address=client_ip,
+        user_agent=ua,
+    )
     db.session.add(vote)
     db.session.commit()
     flash('Głos został oddany!', 'success')
@@ -496,6 +516,35 @@ def admin_delete_movie(movie_id):
     return redirect(url_for('admin_movies'))
 
 
+@app.route('/admin/votes')
+@admin_required
+def admin_votes():
+    round_num = request.args.get('round', type=int)
+    query = Vote.query.order_by(Vote.created_at.desc())
+    if round_num:
+        query = query.filter_by(round_number=round_num)
+    votes = query.all()
+    movie_cache = {}
+    for v in votes:
+        if v.movie_id not in movie_cache:
+            movie_cache[v.movie_id] = Movie.query.get(v.movie_id)
+    rounds = Round.query.order_by(Round.round_number).all()
+    return render_template('admin/votes.html', votes=votes,
+                           movie_cache=movie_cache, rounds=rounds,
+                           current_round=round_num)
+
+
+@app.route('/admin/votes/delete/<int:vote_id>', methods=['POST'])
+@admin_required
+def admin_delete_vote(vote_id):
+    vote = Vote.query.get(vote_id)
+    if vote:
+        db.session.delete(vote)
+        db.session.commit()
+        flash('Głos usunięty.', 'success')
+    return redirect(request.referrer or url_for('admin_votes'))
+
+
 @app.route('/admin/reset', methods=['POST'])
 @admin_required
 def admin_reset():
@@ -558,13 +607,15 @@ def admin_settings():
             cfg['admin_user'] = admin_user
 
         cfg['tmdb_api_key'] = tmdb_key
+        cfg['vote_per_ip'] = request.form.get('vote_per_ip') == '1'
         save_config(cfg)
         flash('Ustawienia zapisane.', 'success')
         return redirect(url_for('admin_settings'))
 
     return render_template('admin/settings.html',
                            admin_user=cfg.get('admin_user', ''),
-                           tmdb_key=cfg.get('tmdb_api_key', ''))
+                           tmdb_key=cfg.get('tmdb_api_key', ''),
+                           vote_per_ip=cfg.get('vote_per_ip', False))
 
 
 def migrate_db():
@@ -573,6 +624,8 @@ def migrate_db():
         db.session.execute(text("ALTER TABLE movies ADD COLUMN IF NOT EXISTS poster_url VARCHAR(500)"))
         db.session.execute(text("ALTER TABLE movies ADD COLUMN IF NOT EXISTS rating FLOAT"))
         db.session.execute(text("ALTER TABLE movies ADD COLUMN IF NOT EXISTS age_rating VARCHAR(10)"))
+        db.session.execute(text("ALTER TABLE votes ADD COLUMN IF NOT EXISTS ip_address VARCHAR(50)"))
+        db.session.execute(text("ALTER TABLE votes ADD COLUMN IF NOT EXISTS user_agent VARCHAR(500)"))
         db.session.commit()
     except Exception:
         db.session.rollback()

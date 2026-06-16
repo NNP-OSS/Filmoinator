@@ -70,6 +70,8 @@
         <h1>🔧 Ustawienia</h1>
         <nav>
             <a href="{{ url_for('admin_dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('admin_movies') }}">Filmy</a>
+            <a href="{{ url_for('admin_votes') }}">Głosy</a>
             <a href="{{ url_for('admin_logout') }}">Wyloguj</a>
         </nav>
     </div>
@@ -102,6 +104,16 @@
                 <label>Klucz API TMDB</label>
                 <input type="text" name="tmdb_key" value="{{ tmdb_key }}" placeholder="API Read Access Token (v4)">
                 <div class="hint">Potrzebny do wyszukiwania filmów. Pobierz z <a href="https://www.themoviedb.org/settings/api" target="_blank" style="color:#ffd200;">themoviedb.org</a>.</div>
+
+                <hr class="separator">
+
+                <label style="display:flex;align-items:center;gap:10px;margin-top:16px;cursor:pointer;">
+                    <input type="checkbox" name="vote_per_ip" value="1"
+                           style="width:18px;height:18px;accent-color:#ffd200;"
+                           {% if vote_per_ip %}checked{% endif %}>
+                    <span style="color:#e0e0e0;">Ogranicz do 1 głosu na adres IP</span>
+                </label>
+                <div class="hint" style="margin-left:28px;">Dodatkowe zabezpieczenie — zapobiega głosowaniu z tego samego IP nawet po wyczyszczeniu ciasteczek.</div>
 
                 <button type="submit" class="btn">Zapisz</button>
             </form>
