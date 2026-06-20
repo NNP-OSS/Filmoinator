@@ -6,7 +6,10 @@ Aplikacja webowa do wybierania filmów na wspólny seans. Użytkownicy dodają p
 
 - **Wyszukiwarka filmów** — integracja z TMDB (plakaty, oceny, oznaczenia wiekowe)
 - **System głosowania** — 3 rundy eliminacyjne (top 3 → top 2 → zwycięzca)
-- **Ochrona przed wielokrotnym głosowaniem** — ciasteczka uniemożliwiają głosowanie 2x w tej samej rundzie
+- **Ochrona przed wielokrotnym głosowaniem** — ciasteczka + opcjonalnie IP
+- **Dodatkowy głos** — admin może zezwolić użytkownikowi na oddanie drugiego głosu (bez usuwania pierwszego)
+- **ID urządzenia** — każdy użytkownik widzi swój identyfikator (#ABCD) na dole strony, co ułatwia znalezienie swojego głosu w panelu admina
+- **Adminer** — zarządzanie bazą danych przez przeglądarkę pod `/adminer`
 
 ## Wymagania
 
@@ -58,6 +61,18 @@ environment:
   SECRET_KEY: twoj_wlasny_klucz
 ```
 
+## Adminer (zarządzanie bazą danych)
+
+Dostępny pod **http://localhost/adminer/**. Logowanie:
+
+| Pole | Wartość |
+|------|---------|
+| System | PostgreSQL |
+| Serwer | `db` |
+| Użytkownik | `filmoinator` |
+| Hasło | `filmoinator_secret` |
+| Baza | `filmoinator` |
+
 ## Resetowanie hasła / konfiguracji
 
 Usuń plik `data/config.json` i zrestartuj kontenery:
@@ -82,12 +97,15 @@ Administrator steruje fazami z poziomu panelu administracyjnego.
 
 ## Panel administracyjny
 
-Dostępny pod adresem `/admin/login`. Funkcje:
+Dostępny pod `/admin` (przekierowuje do dashboardu jeśli sesja jest aktywna, w przeciwnym razie do logowania). Funkcje:
 
 - Sterowanie rundami (rozpoczęcie/zakończenie głosowania)
 - Podgląd statystyk głosowania na żywo
+- Lista głosów z detalami (ID urządzenia, adres IP, przeglądarka)
+- Cofanie głosów i zezwalanie na dodatkowy głos
 - Zarządzanie filmami (przeglądanie/usuwanie)
 - Zmiana klucza TMDB, loginu i hasła
+- Włączanie/wyłączanie blokady według adresu IP
 - Resetowanie całego głosowania
 
 ## Technologie
@@ -97,3 +115,4 @@ Dostępny pod adresem `/admin/login`. Funkcje:
 - **Serwer HTTP:** Nginx
 - **API zewnętrzne:** TMDB (The Movie Database)
 - **Konteneryzacja:** Docker, Docker Compose
+- **Zarządzanie DB:** Adminer
