@@ -331,6 +331,25 @@
             btn.textContent = '⛶ Pełny ekran';
         }
     });
+
+    (function() {
+        var grid = document.querySelector('.movie-grid');
+        if (!grid || grid.children.length < 2) return;
+        var speed = 0.5;
+        var dir = 1;
+        var paused = false;
+        function scrollLoop() {
+            if (!paused) {
+                grid.scrollLeft += speed * dir;
+                if (grid.scrollLeft >= grid.scrollWidth - grid.clientWidth) dir = -1;
+                if (grid.scrollLeft <= 0) dir = 1;
+            }
+            requestAnimationFrame(scrollLoop);
+        }
+        grid.addEventListener('mouseenter', function() { paused = true; });
+        grid.addEventListener('mouseleave', function() { paused = false; });
+        requestAnimationFrame(scrollLoop);
+    })();
     </script>
 </body>
 </html>
