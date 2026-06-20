@@ -463,6 +463,37 @@ def admin_dashboard():
                            vote_count=vote_count, vote_stats=vote_stats)
 
 
+@app.route('/admin/widok')
+@admin_required
+def admin_widok():
+    active_round = get_active_round()
+    movie_count = Movie.query.count()
+    vote_count = Vote.query.count()
+    cfg = load_config()
+    qr_url = cfg.get('qr_url', request.host_url.rstrip('/'))
+
+    movies = []
+    vote_stats = []
+    if active_round:
+        if active_round.round_number == 1:
+            movies = Movie.query.filter_by(round_added=1).all()
+        else:
+            prev = Result.query.filter_by(round_number=active_round.round_number - 1).all()
+            movie_ids = [r.movie_id for r in prev]
+            movies = Movie.query.filter(Movie.id.in_(movie_ids)).all()
+
+        if active_round.phase == 'voting':
+            vc = count_votes(active_round.round_number)
+            for movie_id, title, cnt in vc:
+                movie = Movie.query.get(movie_id)
+                vote_stats.append({'title': title, 'votes': cnt, 'movie': movie})
+
+    return render_template('admin/widok.html', active_round=active_round,
+                           movies=movies, movie_count=movie_count,
+                           vote_count=vote_count, vote_stats=vote_stats,
+                           qr_url=qr_url)
+
+
 @app.route('/admin/round/next', methods=['POST'])
 @admin_required
 def admin_round_next():
@@ -633,6 +664,7 @@ def admin_settings():
 
         cfg['tmdb_api_key'] = tmdb_key
         cfg['vote_per_ip'] = request.form.get('vote_per_ip') == '1'
+        cfg['qr_url'] = request.form.get('qr_url', '').strip()
         save_config(cfg)
         flash('Ustawienia zapisane.', 'success')
         return redirect(url_for('admin_settings'))
@@ -640,7 +672,8 @@ def admin_settings():
     return render_template('admin/settings.html',
                            admin_user=cfg.get('admin_user', ''),
                            tmdb_key=cfg.get('tmdb_api_key', ''),
-                           vote_per_ip=cfg.get('vote_per_ip', False))
+                           vote_per_ip=cfg.get('vote_per_ip', False),
+                           qr_url=cfg.get('qr_url', ''))
 
 
 def migrate_db():

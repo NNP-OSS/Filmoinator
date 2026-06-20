@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Widok - Filmoinator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            height: 100%; overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            color: #e0e0e0;
+        }
+        .layout {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            padding: 2vh 2vw;
+            gap: 1.5vh;
+        }
+
+        .top-row {
+            display: flex;
+            align-items: center;
+            gap: 2vw;
+            flex-shrink: 0;
+        }
+        .top-row h1 {
+            font-size: 1.4vw;
+            background: linear-gradient(90deg, #f7971e, #ffd200);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            white-space: nowrap;
+        }
+
+        .mid-row {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            gap: 2vw;
+        }
+
+        .stats-panel {
+            width: 22vw;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5vh;
+        }
+        .stat-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            padding: 1.2vh 1.2vw;
+            border: 1px solid rgba(255,255,255,0.06);
+        }
+        .stat-card .num { font-size: 1.8vw; font-weight: 700; color: #ffd200; }
+        .stat-card .label { color: #888; font-size: 0.75vw; margin-top: 2px; }
+
+        .qr-box {
+            flex: 1;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.06);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1vh;
+            gap: 0.5vh;
+        }
+        .qr-box img {
+            max-width: 80%;
+            max-height: 70%;
+            border-radius: 8px;
+        }
+        .qr-box .qr-label { color: #888; font-size: 0.7vw; text-align: center; }
+
+        .movie-area {
+            flex: 1;
+            min-width: 0;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.06);
+            padding: 1.5vh 1.2vw;
+            display: flex;
+            flex-direction: column;
+        }
+        .movie-area h2 { font-size: 0.9vw; color: #ffd200; margin-bottom: 1vh; flex-shrink: 0; }
+        .movie-grid {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            gap: 1vw;
+            overflow-x: auto;
+            align-items: stretch;
+        }
+        .movie-card {
+            background: rgba(255,255,255,0.04);
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.06);
+            flex: 0 0 auto;
+            width: 13vw;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .movie-card .poster {
+            width: 100%;
+            aspect-ratio: 2/3;
+            object-fit: cover;
+            display: block;
+            background: rgba(255,255,255,0.03);
+        }
+        .movie-card .info { padding: 0.6vw; flex: 1; display: flex; flex-direction: column; justify-content: center; }
+        .movie-card .title { font-size: 0.75vw; font-weight: 500; line-height: 1.2; }
+        .movie-card .meta { display: flex; gap: 0.4vw; align-items: center; margin-top: 0.3vw; }
+        .movie-card .rating { font-size: 0.65vw; color: #ffd200; }
+        .movie-card .age {
+            font-size: 0.6vw; padding: 1px 5px; border-radius: 3px;
+            background: rgba(255,255,255,0.08); color: #aaa;
+            border: 1px solid rgba(255,255,255,0.1); font-weight: 600;
+        }
+        .movie-card .vote-count {
+            font-size: 0.65vw; color: #81c784; font-weight: 600; margin-top: 0.3vw;
+        }
+        .empty-movies { color: #555; font-size: 0.8vw; text-align: center; padding: 2vw; }
+
+        .bottom-row {
+            flex-shrink: 0;
+            display: flex;
+            gap: 1vw;
+            align-items: stretch;
+            min-height: 0;
+        }
+        .vote-bars {
+            flex: 1;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.06);
+            padding: 1vh 1.2vw;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 0.3vh;
+        }
+        .vote-bars h2 { font-size: 0.75vw; color: #ffd200; margin-bottom: 0.3vh; flex-shrink: 0; }
+        .bar-row { display: flex; align-items: center; gap: 0.5vw; font-size: 0.65vw; }
+        .bar-row .bar-label { width: 10vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #ccc; }
+        .bar-row .bar-track {
+            flex: 1; height: 1.2vh; background: rgba(255,255,255,0.06);
+            border-radius: 4px; overflow: hidden;
+        }
+        .bar-row .bar-fill {
+            height: 100%; border-radius: 4px;
+            background: linear-gradient(90deg, #f7971e, #ffd200);
+            transition: width 0.5s;
+        }
+        .bar-row .bar-count { width: 2vw; text-align: right; color: #ffd200; font-weight: 600; }
+        .empty-votes { color: #555; font-size: 0.7vw; text-align: center; padding: 1vw; }
+
+        .phase-badge {
+            display: inline-block; padding: 2px 10px; border-radius: 8px;
+            font-size: 0.65vw; font-weight: 600;
+        }
+        .phase-submission { background: rgba(33,150,243,0.2); color: #64b5f6; }
+        .phase-voting { background: rgba(76,175,80,0.2); color: #81c784; }
+        .phase-closed { background: rgba(255,152,0,0.2); color: #ffb74d; }
+        .phase-pending { background: rgba(255,255,255,0.1); color: #888; }
+
+        .btn-fullscreen {
+            position: fixed; bottom: 2vh; right: 2vw;
+            background: rgba(255,255,255,0.1);
+            color: #888;
+            border: 1px solid rgba(255,255,255,0.12);
+            padding: 0.5vw 0.8vw;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.7vw;
+            transition: all 0.2s;
+            z-index: 1000;
+        }
+        .btn-fullscreen:hover { background: rgba(255,255,255,0.2); color: #fff; }
+
+        .back-link {
+            position: fixed; bottom: 2vh; left: 2vw;
+            color: #555;
+            font-size: 0.65vw;
+            text-decoration: none;
+            z-index: 1000;
+        }
+        .back-link:hover { color: #ffd200; }
+
+        .live-dot {
+            display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+            background: #4caf50; margin-right: 4px; animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        @media (max-width: 700px) {
+            html, body { overflow: auto; height: auto; }
+            .layout { height: auto; padding: 10px; gap: 10px; }
+            .top-row h1 { font-size: 16px; }
+            .mid-row { flex-direction: column; }
+            .stats-panel { width: 100%; flex-direction: row; flex-wrap: wrap; }
+            .stat-card { flex: 1; min-width: 100px; }
+            .stat-card .num { font-size: 20px; }
+            .qr-box img { max-height: 120px; }
+            .movie-card { width: 200px; }
+            .movie-card .title { font-size: 12px; }
+            .movie-card .rating { font-size: 10px; }
+            .bottom-row { flex-direction: column; }
+            .bar-row { font-size: 10px; }
+            .bar-row .bar-label { width: 80px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <div class="top-row">
+            <h1>🍿 Filmoinator</h1>
+            <span class="phase-badge phase-{{ active_round.phase if active_round else 'pending' }}">
+                {% if active_round %}
+                    Runda {{ active_round.round_number }} ·
+                    {% if active_round.phase == 'submission' %}Dodawanie filmów
+                    {% elif active_round.phase == 'voting' %}Głosowanie
+                    {% elif active_round.phase == 'closed' %}Zamknięta
+                    {% elif active_round.phase == 'pending' %}Oczekuje{% endif %}
+                {% else %}
+                    Brak aktywnej rundy
+                {% endif %}
+            </span>
+            {% if active_round and active_round.phase == 'voting' %}
+            <span style="font-size:0.65vw;color:#81c784;"><span class="live-dot"></span>NA ŻYWO</span>
+            {% endif %}
+        </div>
+
+        <div class="mid-row">
+            <div class="stats-panel">
+                <div class="stat-card">
+                    <div class="num">{{ movie_count }}</div>
+                    <div class="label">Filmy</div>
+                </div>
+                <div class="stat-card">
+                    <div class="num">{{ vote_count }}</div>
+                    <div class="label">Oddane głosy</div>
+                </div>
+                {% if active_round and active_round.phase == 'voting' %}
+                <div class="stat-card" style="flex:1;">
+                    <div class="num" style="font-size:1.2vw;">{{ movies|length }}</div>
+                    <div class="label">Filmów w rundzie</div>
+                </div>
+                {% endif %}
+                <div class="qr-box">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={{ qr_url | urlencode }}" alt="QR Code">
+                    <div class="qr-label">Zeskanuj aby głosować</div>
+                </div>
+            </div>
+
+            <div class="movie-area">
+                <h2>🎬 Filmy{% if active_round %} — runda {{ active_round.round_number }}{% endif %}</h2>
+                {% if movies %}
+                <div class="movie-grid">
+                    {% for m in movies %}
+                    <div class="movie-card">
+                        {% if m.poster_url %}
+                        <img src="{{ m.poster_url }}" alt="" class="poster" loading="lazy" onerror="this.style.display='none'">
+                        {% endif %}
+                        <div class="info">
+                            <div class="title">{{ m.title }}</div>
+                            <div class="meta">
+                                {% if m.rating %}
+                                <span class="rating">⭐ {{ m.rating }}</span>
+                                {% endif %}
+                                {% if m.age_rating %}
+                                <span class="age">{{ m.age_rating }}</span>
+                                {% endif %}
+                            </div>
+                            {% set vs = vote_stats | selectattr('movie.id', 'equalto', m.id) | first %}
+                            {% if vs %}
+                            <div class="vote-count">{{ vs.votes }} głosów</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-movies">Brak filmów w tej rundzie</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="bottom-row">
+            <div class="vote-bars">
+                <h2>📊 Głosy</h2>
+                {% if vote_stats %}
+                {% set max_votes = vote_stats[0].votes if vote_stats else 1 %}
+                {% for s in vote_stats %}
+                <div class="bar-row">
+                    <span class="bar-label">{{ s.title }}</span>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width: {{ (s.votes / max_votes * 100)|int if max_votes > 0 else 0 }}%;"></div>
+                    </div>
+                    <span class="bar-count">{{ s.votes }}</span>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="empty-votes">Brak oddanych głosów</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <a href="{{ url_for('admin_dashboard') }}" class="back-link">← Panel sterowania</a>
+    <button class="btn-fullscreen" onclick="toggleFullscreen()">⛶ Pełny ekran</button>
+
+    <script>
+    function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen();
+        } else {
+            document.exitFullscreen();
+        }
+    }
+    document.addEventListener('fullscreenchange', function() {
+        var btn = document.querySelector('.btn-fullscreen');
+        if (document.fullscreenElement) {
+            btn.textContent = '⛶ Zamknij pełny ekran';
+        } else {
+            btn.textContent = '⛶ Pełny ekran';
+        }
+    });
+    </script>
+</body>
+</html>
