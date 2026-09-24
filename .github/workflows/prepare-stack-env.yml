@@ -1,0 +1,19 @@
+name: Prepare stack environment
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Create stack.env from the example
+        run: cp stack.env.example stack.env
+
+      - name: Validate Docker Compose configuration
+        run: docker compose config --quiet
