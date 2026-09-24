@@ -9,7 +9,6 @@ Aplikacja webowa do wybierania filmów na wspólny seans. Użytkownicy dodają p
 - **Ochrona przed wielokrotnym głosowaniem** — ciasteczka + opcjonalnie IP
 - **Dodatkowy głos** — admin może zezwolić użytkownikowi na oddanie drugiego głosu (bez usuwania pierwszego)
 - **ID urządzenia** — każdy użytkownik widzi swój identyfikator (#ABCD) na dole strony, co ułatwia znalezienie swojego głosu w panelu admina
-- **Adminer** — zarządzanie bazą danych przez przeglądarkę pod `/adminer`
 
 ## Wymagania
 
@@ -17,31 +16,48 @@ Aplikacja webowa do wybierania filmów na wspólny seans. Użytkownicy dodają p
 
 ## Szybki start
 
+Skopiuj plik zmiennych środowiskowych i ustaw własne wartości:
+
 ```bash
-git clone https://github.com/NNP-OSS/Filmoinator.git
-cd Filmoinator
-docker compose up -d
+cp stack.env.example stack.env
 ```
 
-Po uruchomieniu wejdź na **http://localhost** — pierwsze uruchomienie przekieruje do konfiguracji.
+Najważniejsze zmienne:
 
-## Konfiguracja
+| Zmienna | Opis |
+|---|---|
+| `ADMIN_PASSWORD` | Hasło do panelu administracyjnego |
+| `TMDB_API_KEY` | Opcjonalny TMDB API Read Access Token v4 |
+| `POSTGRES_PASSWORD` | Hasło bazy danych używane przez PostgreSQL i aplikację |
+| `QR_URL` | Opcjonalny adres wyświetlany jako kod QR w widoku projektora |
 
-### Pierwsze uruchomienie
+Uruchom stack:
 
-1. Wejdź na http://localhost
-2. Wypełnij formularz:
-   - **Nazwa użytkownika** — login do panelu administracyjnego
-   - **Hasło** — minimum 4 znaki
-   - **Klucz API TMDB** (opcjonalnie) — potrzebny do wyszukiwania filmów
+```bash
+docker compose up -d --build
+```
 
-### Klucz API TMDB
+Po uruchomieniu wejdź na **http://localhost**. Klucz sesji Flask jest generowany automatycznie przy każdym uruchomieniu, a ustawienie blokady głosów według adresu IP zmienisz w panelu administracyjnym.
 
-1. Załóż konto na [themoviedb.org](https://www.themoviedb.org/settings/api)
-2. Wygeneruj **API Read Access Token (v4)**
-3. Wpisz go podczas konfiguracji lub później w panelu admina → Ustawienia
+```bash
+docker compose up -d --force-recreate app
+```
 
-### Zmiana portu
+## Panel administracyjny
+
+Panel jest dostępny pod **http://localhost/admin**. Logowanie wymaga wyłącznie hasła ustawionego w `ADMIN_PASSWORD`; nazwa użytkownika nie jest używana.
+
+Funkcje panelu:
+
+- Sterowanie rundami (rozpoczęcie/zakończenie głosowania)
+- Podgląd statystyk głosowania na żywo i widok projektora `/admin/widok`
+- Lista głosów z detalami (ID urządzenia, adres IP, przeglądarka)
+- Cofanie głosów i zezwalanie na dodatkowy głos
+- Zarządzanie filmami
+- Włączanie/wyłączanie blokady według adresu IP
+- Resetowanie całego głosowania
+
+## Zmiana portu
 
 W `docker-compose.yml` zmień mapowanie portów dla serwisu `nginx`:
 
@@ -49,40 +65,28 @@ W `docker-compose.yml` zmień mapowanie portów dla serwisu `nginx`:
 services:
   nginx:
     ports:
-      - "8080:80"   # zmień 8080 na dowolny port
+      - "8080:80"
 ```
 
-### Zmiana klucza secret (sessions)
+## Dane i reset
 
-W `docker-compose.yml` dla serwisu `app`:
+Stack nie montuje katalogów hosta do kontenerów. Baza danych jest przechowywana w nazwanym volume Docker `postgres_data`, a konfiguracja aplikacji pochodzi wyłącznie ze `stack.env`. Aplikacja buduje adres połączenia z `POSTGRES_DB`, `POSTGRES_USER` i `POSTGRES_PASSWORD`, więc te wartości muszą być spójne.
 
-```yaml
-environment:
-  SECRET_KEY: twoj_wlasny_klucz
-```
-
-## Adminer (zarządzanie bazą danych)
-
-Dostępny pod **http://localhost/adminer/**. Logowanie:
-
-| Pole | Wartość |
-|------|---------|
-| System | PostgreSQL |
-| Serwer | `db` |
-| Użytkownik | `filmoinator` |
-| Hasło | `filmoinator_secret` |
-| Baza | `filmoinator` |
-
-## Resetowanie hasła / konfiguracji
-
-Usuń plik `data/config.json` i zrestartuj kontenery:
+Jeśli istniejący volume został utworzony ze starym hasłem, zmiana `POSTGRES_PASSWORD` nie zmieni hasła w PostgreSQL. Aby zachować dane, ustaw w `stack.env` poprzednie hasło albo zmień hasło użytkownika z poziomu lokalnego socketu kontenera:
 
 ```bash
-rm data/config.json
-docker compose restart
+docker compose up -d db
+docker compose exec -T db psql -U postgres -c \
+  "ALTER USER filmoinator WITH PASSWORD 'NOWE_HASŁO_ZE_STACK_ENV';"
+docker compose up -d --build --remove-orphans
 ```
 
-Po wejściu na stronę zobaczysz ponownie formularz konfiguracji. **Baza danych** (filmy, głosy, wyniki) pozostaje nienaruszona.
+Przy świadomym usunięciu danych można utworzyć bazę od nowa:
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```
 
 ## Jak to działa
 
@@ -95,19 +99,6 @@ Po wejściu na stronę zobaczysz ponownie formularz konfiguracji. **Baza danych*
 
 Administrator steruje fazami z poziomu panelu administracyjnego.
 
-## Panel administracyjny
-
-Dostępny pod `/admin` (przekierowuje do dashboardu jeśli sesja jest aktywna, w przeciwnym razie do logowania). Funkcje:
-
-- Sterowanie rundami (rozpoczęcie/zakończenie głosowania)
-- Podgląd statystyk głosowania na żywo
-- Lista głosów z detalami (ID urządzenia, adres IP, przeglądarka)
-- Cofanie głosów i zezwalanie na dodatkowy głos
-- Zarządzanie filmami (przeglądanie/usuwanie)
-- Zmiana klucza TMDB, loginu i hasła
-- Włączanie/wyłączanie blokady według adresu IP
-- Resetowanie całego głosowania
-
 ## Technologie
 
 - **Backend:** Python, Flask, SQLAlchemy, Gunicorn
@@ -115,4 +106,3 @@ Dostępny pod `/admin` (przekierowuje do dashboardu jeśli sesja jest aktywna, w
 - **Serwer HTTP:** Nginx
 - **API zewnętrzne:** TMDB (The Movie Database)
 - **Konteneryzacja:** Docker, Docker Compose
-- **Zarządzanie DB:** Adminer

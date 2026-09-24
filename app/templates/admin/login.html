@@ -33,7 +33,7 @@
             background-clip: text;
         }
         .login-box p { text-align: center; color: #888; margin-bottom: 25px; font-size: 0.9em; }
-        input[type="text"], input[type="password"] {
+        input[type="password"] {
             width: 100%;
             padding: 12px 16px;
             border-radius: 8px;
@@ -75,7 +75,6 @@
         {% endif %}
         {% endwith %}
         <form method="POST">
-            <input type="text" name="username" placeholder="Nazwa użytkownika" required>
             <input type="password" name="password" placeholder="Hasło" required>
             <button type="submit" class="btn">Zaloguj się</button>
         </form>

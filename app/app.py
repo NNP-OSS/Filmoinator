@@ -1,8 +1,9 @@
 import os
+import secrets
 import uuid
-import json
-import hashlib
+import hmac
 from functools import wraps
+from urllib.parse import quote_plus
 
 from flask import (
     Flask, render_template, request, redirect, url_for,
@@ -13,49 +14,29 @@ from sqlalchemy import text
 from tmdb import search_movies, get_age_rating, get_movie_details
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'default_secret_key')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
-    'DATABASE_URL', 'postgresql://filmoinator:filmoinator_secret@db:5432/filmoinator'
-)
+app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
+database_url = os.environ.get('DATABASE_URL')
+if not database_url:
+    database_user = quote_plus(os.environ.get('POSTGRES_USER', 'filmoinator'))
+    database_password = quote_plus(os.environ.get('POSTGRES_PASSWORD', ''))
+    database_name = quote_plus(os.environ.get('POSTGRES_DB', 'filmoinator'))
+    database_url = (
+        f'postgresql://{database_user}:{database_password}'
+        f'@db:5432/{database_name}'
+    )
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-CONFIG_PATH = os.environ.get('CONFIG_PATH', '/data/config.json')
 
 db = SQLAlchemy(app)
 
 
-def load_config():
-    if not os.path.exists(CONFIG_PATH):
-        return {}
-    try:
-        with open(CONFIG_PATH) as f:
-            return json.load(f)
-    except (json.JSONDecodeError, IOError):
-        return {}
-
-
-def save_config(data):
-    os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
-    with open(CONFIG_PATH, 'w') as f:
-        json.dump(data, f, indent=2)
-
-
-def is_setup_done():
-    cfg = load_config()
-    return bool(cfg.get('setup_complete'))
-
-
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
-
-
-def check_password(password, stored_hash):
-    return hash_password(password) == stored_hash
-
-
 def get_config_value(key, default=''):
-    cfg = load_config()
-    return cfg.get(key, default)
+    return os.environ.get(key, default)
+
+
+def setting_flag(key):
+    setting = AppSetting.query.filter_by(key=key).first()
+    return setting is not None and setting.value == 'true'
 
 
 class Movie(db.Model):
@@ -107,6 +88,13 @@ class Result(db.Model):
     position = db.Column(db.Integer, nullable=False)
     created_at = db.Column(db.DateTime, server_default=text('CURRENT_TIMESTAMP'))
     __table_args__ = (db.UniqueConstraint('round_number', 'position'),)
+
+
+class AppSetting(db.Model):
+    __tablename__ = 'app_settings'
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(100), unique=True, nullable=False)
+    value = db.Column(db.String(500), nullable=False, default='')
 
 
 def admin_required(f):
@@ -170,49 +158,6 @@ def advance_round(current_round):
 
     db.session.commit()
     return advancing
-
-
-# ---------- Setup / before_request ----------
-
-@app.before_request
-def check_setup():
-    if request.path.startswith('/setup') or request.path.startswith('/static'):
-        return
-    if not is_setup_done():
-        return redirect(url_for('setup'))
-
-
-@app.route('/setup', methods=['GET', 'POST'])
-def setup():
-    if is_setup_done():
-        return redirect(url_for('index'))
-
-    if request.method == 'POST':
-        admin_user = request.form.get('admin_user', '').strip()
-        admin_pass = request.form.get('admin_pass', '')
-        admin_pass2 = request.form.get('admin_pass2', '')
-        tmdb_key = request.form.get('tmdb_key', '').strip()
-
-        if not admin_user or not admin_pass:
-            flash('Podaj nazwę użytkownika i hasło.', 'error')
-            return render_template('setup.html')
-        if admin_pass != admin_pass2:
-            flash('Hasła nie są zgodne.', 'error')
-            return render_template('setup.html')
-        if len(admin_pass) < 4:
-            flash('Hasło musi mieć co najmniej 4 znaki.', 'error')
-            return render_template('setup.html')
-
-        save_config({
-            'setup_complete': True,
-            'admin_user': admin_user,
-            'admin_pass_hash': hash_password(admin_pass),
-            'tmdb_api_key': tmdb_key,
-        })
-        flash('Konfiguracja zakończona! Zaloguj się do panelu admina.', 'success')
-        return redirect(url_for('admin_login'))
-
-    return render_template('setup.html')
 
 
 # ---------- User routes ----------
@@ -286,7 +231,7 @@ def api_search():
     q = request.args.get('q', '').strip()
     if not q or len(q) < 2:
         return jsonify([])
-    api_key = get_config_value('tmdb_api_key')
+    api_key = get_config_value('TMDB_API_KEY')
     if not api_key:
         return jsonify({"error": "Brak klucza API TMDB. Uzupełnij w panelu admina."}), 503
     results = search_movies(q, api_key)
@@ -305,7 +250,7 @@ def submit_movie():
 
     if tmdb_id:
         tmdb_id = int(tmdb_id)
-        api_key = get_config_value('tmdb_api_key')
+        api_key = get_config_value('TMDB_API_KEY')
         if not api_key:
             flash('Brak klucza API TMDB.', 'error')
             return redirect(url_for('index'))
@@ -366,8 +311,7 @@ def vote():
         flash('Już głosowałeś w tej rundzie!', 'error')
         return redirect(url_for('index'))
 
-    cfg = load_config()
-    if cfg.get('vote_per_ip'):
+    if setting_flag('vote_per_ip'):
         client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
         ip_vote = Vote.query.filter_by(
             round_number=active_round.round_number, ip_address=client_ip
@@ -423,15 +367,10 @@ def wyniki():
 
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
-    cfg = load_config()
-    admin_user = cfg.get('admin_user', '')
-    admin_hash = cfg.get('admin_pass_hash', '')
-    if not admin_user or not admin_hash:
-        return redirect(url_for('setup'))
     if request.method == 'POST':
-        username = request.form.get('username', '')
         password = request.form.get('password', '')
-        if username == admin_user and check_password(password, admin_hash):
+        configured_password = get_config_value('ADMIN_PASSWORD')
+        if configured_password and hmac.compare_digest(password, configured_password):
             session['admin_logged_in'] = True
             return redirect(url_for('admin_dashboard'))
         flash('Nieprawidłowe dane logowania.', 'error')
@@ -460,7 +399,27 @@ def admin_dashboard():
 
     return render_template('admin/dashboard.html', active_round=active_round,
                            rounds=rounds, movie_count=movie_count,
-                           vote_count=vote_count, vote_stats=vote_stats)
+                           vote_count=vote_count, vote_stats=vote_stats,
+                           vote_per_ip=setting_flag('vote_per_ip'))
+
+
+@app.route('/admin/settings', methods=['GET', 'POST'])
+@admin_required
+def admin_settings():
+    setting = AppSetting.query.filter_by(key='vote_per_ip').first()
+    if request.method == 'POST':
+        if setting is None:
+            setting = AppSetting(key='vote_per_ip')
+            db.session.add(setting)
+        setting.value = 'true' if request.form.get('vote_per_ip') == '1' else 'false'
+        db.session.commit()
+        flash('Ustawienia zapisane.', 'success')
+        return redirect(url_for('admin_settings'))
+
+    return render_template(
+        'admin/settings.html',
+        vote_per_ip=setting is not None and setting.value == 'true',
+    )
 
 
 @app.route('/admin/widok')
@@ -469,8 +428,7 @@ def admin_widok():
     active_round = get_active_round()
     movie_count = Movie.query.count()
     vote_count = Vote.query.count()
-    cfg = load_config()
-    qr_url = cfg.get('qr_url', request.host_url.rstrip('/'))
+    qr_url = get_config_value('QR_URL') or request.host_url.rstrip('/')
 
     movies = []
     vote_stats = []
@@ -640,42 +598,6 @@ def admin_set_submission():
     return redirect(url_for('admin_dashboard'))
 
 
-@app.route('/admin/settings', methods=['GET', 'POST'])
-@admin_required
-def admin_settings():
-    cfg = load_config()
-    if request.method == 'POST':
-        admin_user = request.form.get('admin_user', '').strip()
-        admin_pass = request.form.get('admin_pass', '')
-        admin_pass2 = request.form.get('admin_pass2', '')
-        tmdb_key = request.form.get('tmdb_key', '').strip()
-
-        if admin_pass or admin_pass2:
-            if admin_pass != admin_pass2:
-                flash('Hasła nie są zgodne.', 'error')
-                return redirect(url_for('admin_settings'))
-            if len(admin_pass) < 4:
-                flash('Hasło musi mieć co najmniej 4 znaki.', 'error')
-                return redirect(url_for('admin_settings'))
-            cfg['admin_pass_hash'] = hash_password(admin_pass)
-
-        if admin_user:
-            cfg['admin_user'] = admin_user
-
-        cfg['tmdb_api_key'] = tmdb_key
-        cfg['vote_per_ip'] = request.form.get('vote_per_ip') == '1'
-        cfg['qr_url'] = request.form.get('qr_url', '').strip()
-        save_config(cfg)
-        flash('Ustawienia zapisane.', 'success')
-        return redirect(url_for('admin_settings'))
-
-    return render_template('admin/settings.html',
-                           admin_user=cfg.get('admin_user', ''),
-                           tmdb_key=cfg.get('tmdb_api_key', ''),
-                           vote_per_ip=cfg.get('vote_per_ip', False),
-                           qr_url=cfg.get('qr_url', ''))
-
-
 def migrate_db():
     try:
         db.session.execute(text("ALTER TABLE movies ADD COLUMN IF NOT EXISTS tmdb_id INTEGER"))
@@ -685,14 +607,31 @@ def migrate_db():
         db.session.execute(text("ALTER TABLE votes ADD COLUMN IF NOT EXISTS ip_address VARCHAR(50)"))
         db.session.execute(text("ALTER TABLE votes ADD COLUMN IF NOT EXISTS user_agent VARCHAR(500)"))
         db.session.execute(text("ALTER TABLE votes DROP CONSTRAINT IF EXISTS votes_round_number_visitor_id_key"))
+        db.session.execute(text(
+            "CREATE TABLE IF NOT EXISTS app_settings ("
+            "id SERIAL PRIMARY KEY, key VARCHAR(100) UNIQUE NOT NULL, "
+            "value VARCHAR(500) NOT NULL DEFAULT '')"
+        ))
         db.session.commit()
     except Exception:
         db.session.rollback()
 
 
+def ensure_rounds():
+    if Round.query.count() == 0:
+        for round_number in [1, 2, 3]:
+            db.session.add(Round(
+                round_number=round_number,
+                phase='submission' if round_number == 1 else 'pending',
+                is_active=round_number == 1,
+            ))
+        db.session.commit()
+
+
 with app.app_context():
     db.create_all()
     migrate_db()
+    ensure_rounds()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

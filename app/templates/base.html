@@ -109,21 +109,6 @@
         .vote-btn:hover { background: #ffd200; color: #1a1a2e; }
         .vote-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-        .admin-link {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(255,255,255,0.1);
-            color: #888;
-            padding: 8px 16px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-size: 0.85em;
-            transition: all 0.2s;
-            z-index: 100;
-        }
-        .admin-link:hover { background: rgba(255,255,255,0.2); color: #fff; }
-
         .winner-box { text-align: center; padding: 30px; }
         .winner-box .trophy { font-size: 4em; margin-bottom: 10px; }
         .winner-box h3 { font-size: 2em; color: #ffd200; margin-bottom: 5px; }
@@ -254,8 +239,6 @@
 
         {% block content %}{% endblock %}
     </div>
-    <a href="{{ url_for('admin_dashboard') }}" class="admin-link">🔧 Panel administracyjny</a>
-
     <div id="device-id" style="position:fixed;bottom:20px;left:20px;color:#444;font-size:0.75em;font-family:monospace;z-index:100;user-select:all;"></div>
 
     <script>
