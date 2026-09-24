@@ -22,6 +22,8 @@ Skopiuj plik zmiennych środowiskowych i ustaw własne wartości:
 cp stack.env.example stack.env
 ```
 
+Plik przykładowy zawiera hasło `admin` przeznaczone wyłącznie do testów lokalnych i workflow. Przed uruchomieniem produkcyjnym zmień `ADMIN_PASSWORD` w lokalnym, ignorowanym pliku `stack.env` na silne własne hasło.
+
 Najważniejsze zmienne:
 
 | Zmienna | Opis |
