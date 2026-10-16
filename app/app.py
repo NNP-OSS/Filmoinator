@@ -11,7 +11,10 @@ from flask import (
 )
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
-from tmdb import search_movies, get_age_rating, get_movie_details
+try:
+    from .tmdb import search_movies, get_age_rating, get_movie_details
+except ImportError:  # uruchomienie jako pojedynczy moduł
+    from tmdb import search_movies, get_age_rating, get_movie_details
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
